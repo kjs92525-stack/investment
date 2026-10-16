@@ -1,0 +1,4 @@
+name = "investment"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-10-16"
+# No credentials here. Configure secrets and Access before publishing.

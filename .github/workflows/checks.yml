@@ -1,0 +1,19 @@
+name: checks
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.23'
+      - run: npm ci
+      - run: npm run build && npm run typecheck:functions && npm run lint && npm test
+      - run: uv python install 3.12 && uv venv --python 3.12 .venv
+      - run: uv pip sync --python .venv/bin/python backend/requirements.lock
+      - run: .venv/bin/python -m pytest tests -q
