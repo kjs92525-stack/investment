@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Open Terminal</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23000'/><text x='16' y='23' font-size='20' text-anchor='middle' fill='%23ff9f1a' font-family='monospace' font-weight='700'>&gt;</text></svg>">
+<link rel="stylesheet" href="css/terminal.css">
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div class="brand"><b>OPEN</b>TERMINAL <span id="mode" class="connecting">…</span></div>
+    <form id="cmdform" autocomplete="off">
+      <label for="cmd" id="target">패널 1</label>
+      <div class="cmdwrap">
+        <input id="cmd" type="text" spellcheck="false" autocapitalize="characters" enterkeyhint="go"
+               placeholder="예: AAPL DES · NVDA GP 1Y · WEI · HELP" aria-label="명령 입력">
+        <ul id="sug" hidden role="listbox"></ul>
+      </div>
+      <button type="submit" class="go">GO</button>
+    </form>
+    <div id="clocks"></div>
+  </header>
+  <div id="status" role="status" aria-live="polite"></div>
+  <div id="demo-banner" hidden>DEMO 모드: 서버(API)에 연결되지 않아 <b>가짜 데이터</b>를 보여줍니다. <code>npm start</code> 로 실행하거나 배포하면 실제 시세가 나옵니다.</div>
+  <main id="grid" class="grid l4"></main>
+  <nav id="fkeys">
+    <button data-cmd="HELP" class="k-help"><kbd>F1</kbd>HELP</button>
+    <button data-cmd="WEI"><kbd>F2</kbd>WEI</button>
+    <button data-cmd="FX"><kbd>F3</kbd>FX</button>
+    <button data-cmd="W"><kbd>F4</kbd>W</button>
+    <button data-cmd="CMDTY">CMDTY</button>
+    <button data-cmd="CRYPTO">CRYPTO</button>
+    <button data-cmd="GC">GC</button>
+    <button data-cmd="N">N</button>
+    <button data-cmd="DES" class="k-sec">DES</button>
+    <button data-cmd="GP" class="k-sec">GP</button>
+    <span class="sp"></span>
+    <button data-cmd="LAYOUT 1" class="k-lay" title="1분할">▣</button>
+    <button data-cmd="LAYOUT 2" class="k-lay" title="2분할">◫</button>
+    <button data-cmd="LAYOUT 4" class="k-lay" title="4분할">⊞</button>
+  </nav>
+</div>
+<script src="vendor/lightweight-charts.standalone.production.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

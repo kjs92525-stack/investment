@@ -1,0 +1,12 @@
+{
+  "name": "open-terminal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "블룸버그 스타일 명령줄 + 멀티 패널 시장 단말기",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test \"tests/*.test.mjs\""
+  }
+}

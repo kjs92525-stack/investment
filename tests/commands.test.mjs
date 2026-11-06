@@ -1,0 +1,56 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { parseCommand } from '../public/js/commands.js';
+
+const ok = (input, expected) => {
+  const r = parseCommand(input);
+  assert.equal(r.ok, true, `${input}: ${r.error}`);
+  for (const [k, v] of Object.entries(expected)) assert.equal(r[k], v, `${input} → ${k}`);
+};
+const bad = (input) => assert.equal(parseCommand(input).ok, false, input);
+
+test('ticker + function', () => {
+  ok('aapl des', { func: 'DES', ticker: 'AAPL' });
+  ok('AAPL GP', { func: 'GP', ticker: 'AAPL', range: '6M' });
+  ok('GP AAPL 1y', { func: 'GP', ticker: 'AAPL', range: '1Y' });
+  ok('NVDA 5D', { func: 'GP', ticker: 'NVDA', range: '5D' });
+});
+
+test('bare ticker opens DES', () => {
+  ok('msft', { func: 'DES', ticker: 'MSFT' });
+  ok('BTC-USD', { func: 'DES', ticker: 'BTC-USD' });
+});
+
+test('Bloomberg syntax and exchange codes', () => {
+  ok('AAPL US Equity GP <GO>', { func: 'GP', ticker: 'AAPL' });
+  ok('005930 KS DES', { func: 'DES', ticker: '005930.KS' });
+  ok('247540 KQ GP 1Y', { func: 'GP', ticker: '247540.KQ', range: '1Y' });
+  ok('005930', { func: 'DES', ticker: '005930.KS' });
+  ok('7203 JP GP', { ticker: '7203.T' });
+});
+
+test('functions that look like tickers', () => {
+  ok('W', { func: 'W', ticker: null });
+  ok('W DES', { func: 'DES', ticker: 'W' });
+  ok('W ADD nvda', { func: 'W', ticker: 'NVDA', action: 'ADD' });
+  ok('w del NVDA', { func: 'W', action: 'DEL' });
+});
+
+test('market screens and aliases', () => {
+  for (const f of ['WEI', 'FX', 'CMDTY', 'CRYPTO', 'GC', 'HELP']) ok(f, { func: f, ticker: null });
+  ok('N', { func: 'N', ticker: null });
+  ok('TSLA N', { func: 'N', ticker: 'TSLA' });
+  ok('AAPL Q', { func: 'DES' });
+  ok('?', { func: 'HELP' });
+});
+
+test('errors', () => {
+  bad('');
+  bad('GP');
+  bad('AAPL WEI');
+  bad('AAPL MSFT DES');
+  bad('W ADD');
+  bad('W NVDA');
+  bad('AAPL DES 1Y');
+  bad('A$B DES');
+});
