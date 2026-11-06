@@ -20,8 +20,8 @@ async function get(path) {
   return body;
 }
 
-export const chart = async (symbol, range) =>
-  state.mode === 'live' ? get(`api/chart?symbol=${encodeURIComponent(symbol)}&range=${range}`) : demoChart(symbol, range);
+export const chart = async (symbol, key) =>
+  state.mode === 'live' ? get(`api/chart?symbol=${encodeURIComponent(symbol)}&range=${key}`) : demoChart(symbol, key);
 
 export const quotes = async (symbols) =>
   state.mode === 'live' ? get(`api/quotes?symbols=${symbols.map(encodeURIComponent).join(',')}`) : symbols.map(demoQuote);
@@ -66,7 +66,7 @@ function walk(symbol, seed, n, stepSec, end) {
   return bars;
 }
 
-const STEP = { '1D': [78, 300], '5D': [130, 900], '1M': [150, 3600], '6M': [182, 86400], '1Y': [365, 86400], '5Y': [260, 604800], MAX: [240, 2592000] };
+const STEP = { '5MIN': [390, 300], '15MIN': [520, 900], '60MIN': [880, 3600], D: [500, 86400], W: [520, 604800], M: [300, 2592000], '1D': [78, 300], '5D': [130, 900], '1M': [150, 3600], '6M': [182, 86400], '1Y': [365, 86400], '5Y': [260, 604800], MAX: [240, 2592000] };
 
 export function demoChart(symbol, range = '6M') {
   const [n, step] = STEP[range] || STEP['6M'];

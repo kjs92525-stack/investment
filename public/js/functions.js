@@ -2,7 +2,7 @@
 // return { dispose() } for cleanup. ctx.run(cmdText) loads a command in the
 // same panel (used by clickable rows).
 import * as api from './api.js';
-import { FUNCS, RANGES } from './commands.js';
+import { FUNCS, INTERVALS } from './commands.js';
 import { esc, num, signed, pct, cls, big, ago, spark, decFor } from './format.js';
 
 export const REFRESH_MS = { DES: 30e3, GP: 60e3, N: 120e3, WEI: 30e3, FX: 30e3, CMDTY: 30e3, CRYPTO: 30e3, GC: 60e3, W: 30e3 };
@@ -121,32 +121,89 @@ async function des(el, cmd, ctx) {
       <table class="rets"><tr>${rets.map(([k]) => `<th>${k}</th>`).join('')}</tr>
         <tr>${rets.map(([, v]) => `<td class="${cls(v)}">${pct(v)}</td>`).join('')}</tr></table>
       <div class="des-spark">${spark(bars.map((b) => b.c), 400, 60)}</div>
-      <div class="links"><button data-go="${esc(c.symbol)} GP">GP 차트</button><button data-go="${esc(c.symbol)} N">N 뉴스</button><button data-go="W ADD ${esc(c.symbol)}">W 관심 추가</button></div>
+      <div class="links"><button data-go="${esc(c.symbol)} GP">GP 일봉</button><button data-go="${esc(c.symbol)} GP W">주봉</button><button data-go="${esc(c.symbol)} N">N 뉴스</button><button data-go="W ADD ${esc(c.symbol)}">W 관심 추가</button></div>
     </div>`;
   el.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => ctx.run(b.dataset.go)));
 }
 
 // -------------------------------------------------------------------- GP
+// Korean brokerage style by default: red = up, blue = down. Toggle in the chart bar.
+export const COLOR_KEY = 'ot.colors';
+export function getColors() {
+  try {
+    return localStorage.getItem(COLOR_KEY) === 'us' ? 'us' : 'kr';
+  } catch {
+    return 'kr';
+  }
+}
+export function applyColors(mode = getColors()) {
+  document.documentElement.dataset.colors = mode;
+  try {
+    localStorage.setItem(COLOR_KEY, mode);
+  } catch {}
+}
+
+const MAS = [[5, '#ffd400'], [20, '#ff5fd2'], [60, '#22d3ee'], [120, '#c8c8c8']];
+const INTRADAY = new Set(['5MIN', '15MIN', '60MIN']);
+const VISIBLE_BARS = { '5MIN': 156, '15MIN': 130, '60MIN': 140, D: 120, W: 104, M: 120 };
+
+function sma(bars, n) {
+  const out = [];
+  let sum = 0;
+  for (let i = 0; i < bars.length; i++) {
+    sum += bars[i].c;
+    if (i >= n) sum -= bars[i - n].c;
+    if (i >= n - 1) out.push({ time: bars[i].time, value: sum / n });
+  }
+  return out;
+}
+
 async function gp(el, cmd, ctx) {
-  const c = await api.chart(cmd.ticker, cmd.range);
+  const c = await api.chart(cmd.ticker, cmd.iv);
   const m = c.meta;
-  const first = c.bars[0]?.c, last = c.bars[c.bars.length - 1]?.c;
-  const chg = first && last ? (last / first - 1) * 100 : null;
+  const dec = decFor(m.price, m.currency);
+  const intraday = INTRADAY.has(cmd.iv);
+  const off = m.gmtoffset || 0; // show exchange-local time
+  const bars = c.bars.map((b) => ({ ...b, time: b.t + off }));
+  const prevOf = new Map(bars.map((b, i) => [b.time, i ? bars[i - 1].c : null]));
+
   el.innerHTML = `
     <div class="gp">
       <div class="gp-bar">
         <span class="gp-name">${esc(m.name)}</span>
-        <span>${num(m.price)}</span><span class="${cls(chg)}">${cmd.range} ${pct(chg)}</span>
-        <span class="tabs">${RANGES.map((r) => `<button class="${r === cmd.range ? 'on' : ''}" data-r="${r}">${r}</button>`).join('')}</span>
+        <span class="tabs">${INTERVALS.map(([k, label]) => `<button class="${k === cmd.iv ? 'on' : ''}" data-iv="${k}">${label}</button>`).join('')}</span>
+        <button class="clr" title="상승·하락 색 바꾸기">${getColors() === 'kr' ? '색: 한국식' : '색: 미국식'}</button>
       </div>
+      <div class="gp-legend"></div>
+      <div class="gp-ma">${MAS.map(([n, col]) => `<span style="color:${col}">MA${n}</span>`).join('')}</div>
       <div class="gp-chart"></div>
     </div>`;
-  el.querySelectorAll('[data-r]').forEach((b) => b.addEventListener('click', () => ctx.run(`${cmd.ticker} GP ${b.dataset.r}`)));
+  el.querySelectorAll('[data-iv]').forEach((b) => b.addEventListener('click', () => ctx.run(`${cmd.ticker} GP ${b.dataset.iv}`)));
+  el.querySelector('.clr').addEventListener('click', () => {
+    applyColors(getColors() === 'kr' ? 'us' : 'kr');
+    ctx.run(`${cmd.ticker} GP ${cmd.iv}`);
+  });
+
+  const legend = el.querySelector('.gp-legend');
+  const fmtTime = (t) => {
+    const d = new Date(t * 1000);
+    const p = (n) => String(n).padStart(2, '0');
+    const day = `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+    return intraday ? `${p(d.getUTCMonth() + 1)}/${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}` : cmd.iv === 'M' ? day.slice(0, 7) : day;
+  };
+  const showBar = (b) => {
+    if (!b) return;
+    const prev = prevOf.get(b.time);
+    const chg = prev ? (b.c / prev - 1) * 100 : null;
+    const k = (v) => `<b class="${cls(v - (prev ?? v))}">${num(v, dec)}</b>`;
+    legend.innerHTML = `<span class="dim">${fmtTime(b.time)}</span> 시 ${k(b.o)} 고 ${k(b.h)} 저 ${k(b.l)} 종 ${k(b.c)} <span class="${cls(chg)}">${pct(chg)}</span> <span class="dim">거래량</span> ${big(b.v)}`;
+  };
+  showBar(bars[bars.length - 1]);
 
   const LC = window.LightweightCharts;
   const box = el.querySelector('.gp-chart');
   if (!LC) {
-    box.innerHTML = spark(c.bars.map((b) => b.c), 600, 200);
+    box.innerHTML = spark(bars.map((b) => b.c), 600, 200);
     return;
   }
   const css = getComputedStyle(document.documentElement);
@@ -154,18 +211,34 @@ async function gp(el, cmd, ctx) {
   const chart = LC.createChart(box, {
     autoSize: true,
     layout: { background: { color: 'transparent' }, textColor: css.getPropertyValue('--fg-dim').trim(), fontFamily: 'inherit', fontSize: 11 },
-    grid: { vertLines: { color: '#1a1a1a' }, horzLines: { color: '#1a1a1a' } },
-    rightPriceScale: { borderColor: '#333' },
-    timeScale: { borderColor: '#333', timeVisible: ['1D', '5D', '1M'].includes(cmd.range), secondsVisible: false },
+    grid: { vertLines: { color: '#161616' }, horzLines: { color: '#161616' } },
+    rightPriceScale: { borderColor: '#333', scaleMargins: { top: 0.06, bottom: 0.24 } },
+    timeScale: { borderColor: '#333', timeVisible: intraday, secondsVisible: false, rightOffset: 4 },
     crosshair: { mode: 0 },
+    localization: { priceFormatter: (v) => num(v, dec), timeFormatter: fmtTime },
   });
-  const off = m.gmtoffset || 0; // show exchange-local time
-  const candles = chart.addCandlestickSeries({ upColor: up, downColor: dn, borderUpColor: up, borderDownColor: dn, wickUpColor: up, wickDownColor: dn });
-  candles.setData(c.bars.map((b) => ({ time: b.t + off, open: b.o, high: b.h, low: b.l, close: b.c })));
-  const vol = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } });
-  chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-  vol.setData(c.bars.map((b) => ({ time: b.t + off, value: b.v, color: b.c >= b.o ? up + '66' : dn + '66' })));
-  chart.timeScale().fitContent();
+  const candles = chart.addCandlestickSeries({
+    upColor: up, downColor: dn, borderUpColor: up, borderDownColor: dn, wickUpColor: up, wickDownColor: dn,
+    priceFormat: { type: 'price', precision: dec, minMove: dec ? 10 ** -dec : 1 },
+  });
+  candles.setData(bars.map((b) => ({ time: b.time, open: b.o, high: b.h, low: b.l, close: b.c })));
+  for (const [n, color] of MAS) {
+    if (bars.length < n) continue;
+    const s = chart.addLineSeries({ color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    s.setData(sma(bars, n));
+  }
+  const vol = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
+  chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+  vol.setData(bars.map((b) => ({ time: b.time, value: b.v, color: (b.c >= b.o ? up : dn) + '80' })));
+
+  const byTime = new Map(bars.map((b) => [b.time, b]));
+  chart.subscribeCrosshairMove((p) => showBar(p?.time != null ? byTime.get(p.time) : bars[bars.length - 1]));
+  // Keep the user's scroll/zoom across the 60s refresh (ctx lives as long as this command).
+  const n = VISIBLE_BARS[cmd.iv] || 120;
+  chart.timeScale().setVisibleLogicalRange(ctx.view || { from: Math.max(0, bars.length - n), to: bars.length + 3 });
+  chart.timeScale().subscribeVisibleLogicalRangeChange((r) => {
+    if (r && box.clientWidth) ctx.view = r;
+  });
   return { dispose: () => chart.remove() };
 }
 
@@ -227,7 +300,7 @@ function help(el, cmd, ctx) {
       <h4>입력 예시</h4>
       <ul class="ex">
         <li><code>AAPL</code> 종목만 치면 개요(DES)</li>
-        <li><code>NVDA GP 1Y</code> 1년 차트 · <code>GP TSLA 5D</code> 순서 무관</li>
+        <li><code>NVDA GP</code> 일봉 · <code>NVDA GP 주봉</code> (또는 <code>W</code>) · <code>월봉</code> <code>60분</code> <code>15분</code> <code>5분</code></li>
         <li><code>005930 KS DES</code> 삼성전자 (KS 코스피, KQ 코스닥, JP 일본)</li>
         <li><code>AAPL US Equity GP &lt;GO&gt;</code> 블룸버그 문법도 인식</li>
         <li><code>W ADD NVDA</code> 관심 종목 추가 · <code>W DEL NVDA</code> 삭제</li>

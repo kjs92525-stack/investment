@@ -11,9 +11,14 @@ const bad = (input) => assert.equal(parseCommand(input).ok, false, input);
 
 test('ticker + function', () => {
   ok('aapl des', { func: 'DES', ticker: 'AAPL' });
-  ok('AAPL GP', { func: 'GP', ticker: 'AAPL', range: '6M' });
-  ok('GP AAPL 1y', { func: 'GP', ticker: 'AAPL', range: '1Y' });
-  ok('NVDA 5D', { func: 'GP', ticker: 'NVDA', range: '5D' });
+  ok('AAPL GP', { func: 'GP', ticker: 'AAPL', iv: 'D' });
+  ok('GP AAPL 주봉', { func: 'GP', ticker: 'AAPL', iv: 'W' });
+  ok('NVDA GP W', { func: 'GP', ticker: 'NVDA', iv: 'W' });
+  ok('NVDA 월봉', { func: 'GP', ticker: 'NVDA', iv: 'M' });
+  ok('NVDA GP 5분', { iv: '5MIN' });
+  ok('NVDA GP 1H', { iv: '60MIN' });
+  ok('NVDA GP 1Y', { iv: 'D' }); // old period words still work
+  ok('D GP', { func: 'GP', ticker: 'D', iv: 'D' }); // Dominion Energy
 });
 
 test('bare ticker opens DES', () => {
@@ -24,7 +29,7 @@ test('bare ticker opens DES', () => {
 test('Bloomberg syntax and exchange codes', () => {
   ok('AAPL US Equity GP <GO>', { func: 'GP', ticker: 'AAPL' });
   ok('005930 KS DES', { func: 'DES', ticker: '005930.KS' });
-  ok('247540 KQ GP 1Y', { func: 'GP', ticker: '247540.KQ', range: '1Y' });
+  ok('247540 KQ GP 주봉', { func: 'GP', ticker: '247540.KQ', iv: 'W' });
   ok('005930', { func: 'DES', ticker: '005930.KS' });
   ok('7203 JP GP', { ticker: '7203.T' });
 });
@@ -52,5 +57,6 @@ test('errors', () => {
   bad('W ADD');
   bad('W NVDA');
   bad('AAPL DES 1Y');
+  bad('AAPL DES 주봉');
   bad('A$B DES');
 });

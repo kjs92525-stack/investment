@@ -1,8 +1,9 @@
 import * as api from './api.js';
 import { parseCommand, describe, suggestFuncs, FUNCS } from './commands.js';
-import { render, REFRESH_MS, getWatch, setWatch } from './functions.js';
+import { render, REFRESH_MS, getWatch, setWatch, applyColors } from './functions.js';
 import { esc } from './format.js';
 
+applyColors();
 const STORE = 'ot.layout.v1';
 const DEFAULT = { layout: 4, active: 0, panels: ['WEI', 'AAPL GP', 'AAPL DES', 'N'] };
 
