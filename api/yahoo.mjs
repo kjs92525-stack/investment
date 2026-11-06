@@ -6,8 +6,16 @@ const UA = 'Mozilla/5.0 (compatible; OpenTerminal/0.1)';
 const YF = 'https://query1.finance.yahoo.com';
 const YF2 = 'https://query2.finance.yahoo.com'; // fallback host
 
-// range -> Yahoo interval
+// key -> [Yahoo range, Yahoo interval]
+// Candle-size keys (used by GP): 5MIN 15MIN 60MIN D W M — each fetches enough history to scroll back.
+// Period keys (used by DES and quote tables): 1D 5D 1M 6M 1Y 5Y MAX.
 export const RANGES = {
+  '5MIN': ['5d', '5m'],
+  '15MIN': ['1mo', '15m'],
+  '60MIN': ['6mo', '60m'],
+  D: ['2y', '1d'],
+  W: ['10y', '1wk'],
+  M: ['max', '1mo'],
   '1D': ['1d', '5m'],
   '5D': ['5d', '15m'],
   '1M': ['1mo', '60m'],

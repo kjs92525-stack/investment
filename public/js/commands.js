@@ -7,7 +7,7 @@
 
 export const FUNCS = {
   DES: { ticker: 'required', title: '종목 개요', help: '가격·등락·52주 범위·수익률' },
-  GP: { ticker: 'required', title: '차트', help: '캔들 차트. 기간: 1D 5D 1M 6M 1Y 5Y MAX' },
+  GP: { ticker: 'required', title: '차트', help: '캔들 차트. 봉: 5분 15분 60분 일봉 주봉 월봉' },
   N: { ticker: 'optional', title: '뉴스', help: '종목 뉴스 (종목 없으면 시장 뉴스)' },
   WEI: { ticker: 'none', title: '세계 지수', help: '미국·유럽·아시아 주요 지수' },
   FX: { ticker: 'none', title: '환율', help: '원·달러 등 주요 통화' },
@@ -20,7 +20,21 @@ export const FUNCS = {
 
 export const ALIASES = { Q: 'DES', GIP: 'GP', CN: 'N', TOP: 'N', FXC: 'FX', WB: 'GC', BTC: 'CRYPTO', H: 'HELP', '?': 'HELP' };
 
-export const RANGES = ['1D', '5D', '1M', '6M', '1Y', '5Y', 'MAX'];
+// Candle sizes for GP, in button order. Keys are what the API takes.
+export const INTERVALS = [
+  ['5MIN', '5분'], ['15MIN', '15분'], ['60MIN', '60분'], ['D', '일봉'], ['W', '주봉'], ['M', '월봉'],
+];
+export const IV_LABEL = Object.fromEntries(INTERVALS);
+const IV_WORDS = {
+  '5MIN': '5MIN', '5분': '5MIN', '5분봉': '5MIN',
+  '15MIN': '15MIN', '15분': '15MIN', '15분봉': '15MIN',
+  '60MIN': '60MIN', '1H': '60MIN', '60분': '60MIN', '60분봉': '60MIN', '시간봉': '60MIN',
+  D: 'D', DAY: 'D', DAILY: 'D', '일': 'D', '일봉': 'D',
+  W: 'W', WK: 'W', WEEK: 'W', WEEKLY: 'W', '주': 'W', '주봉': 'W',
+  M: 'M', MO: 'M', MONTH: 'M', MONTHLY: 'M', '월': 'M', '월봉': 'M',
+  // older period words still work
+  '1D': '5MIN', '5D': '15MIN', '1M': '60MIN', '6M': 'D', '1Y': 'D', '5Y': 'W', MAX: 'M',
+};
 const ACTIONS = ['ADD', 'DEL'];
 
 // Bloomberg market-sector words that carry no meaning here.
@@ -38,7 +52,7 @@ function funcOf(tok) {
 }
 
 /**
- * @returns {{ok:true, func:string, ticker:string|null, range:string|null, action:string|null}
+ * @returns {{ok:true, func:string, ticker:string|null, iv:string|null, action:string|null}
  *          | {ok:false, error:string}}
  */
 export function parseCommand(input) {
@@ -60,6 +74,19 @@ export function parseCommand(input) {
   }
   toks = merged;
 
+  // Candle size ("NVDA GP 주봉", "NVDA W"). Never the first word, so tickers
+  // like D (Dominion) or W (Wayfair) and the W watchlist still work.
+  let iv = null;
+  if (!toks.some((t) => ACTIONS.includes(t))) {
+    for (let i = toks.length - 1; i >= 1; i--) {
+      if (IV_WORDS[toks[i]]) {
+        iv = IV_WORDS[toks[i]];
+        toks.splice(i, 1);
+        break;
+      }
+    }
+  }
+
   // The function is the LAST function word, so a ticker that looks like a
   // function ("W DES" = Wayfair) still works. "W ADD NVDA" -> W.
   let fIdx = -1;
@@ -69,15 +96,14 @@ export function parseCommand(input) {
       break;
     }
   }
-  const range = toks.find((t) => RANGES.includes(t)) || null;
   const action = toks.find((t) => ACTIONS.includes(t)) || null;
-  const rest = toks.filter((t, i) => i !== fIdx && t !== range && t !== action);
+  const rest = toks.filter((t, i) => i !== fIdx && t !== action);
 
   let func = fIdx >= 0 ? funcOf(toks[fIdx]) : null;
   let ticker = rest[0] || null;
   if (rest.length > 1) return { ok: false, error: `알 수 없는 입력: ${rest.slice(1).join(' ')}` };
 
-  if (!func) func = range ? 'GP' : 'DES';
+  if (!func) func = iv ? 'GP' : 'DES';
   const spec = FUNCS[func];
   if (ticker) {
     if (/^\d{6}$/.test(ticker)) ticker += '.KS'; // Korean code without suffix
@@ -87,15 +113,15 @@ export function parseCommand(input) {
   if (spec.ticker === 'none' && ticker) return { ok: false, error: `${func} 는 종목 없이 입력합니다.` };
   if (func === 'W' && action && !ticker) return { ok: false, error: `예: W ${action} NVDA` };
   if (func === 'W' && ticker && !action) return { ok: false, error: '예: W ADD NVDA 또는 W DEL NVDA' };
-  if (range && func !== 'GP') return { ok: false, error: '기간(1Y 등)은 GP 와 함께 씁니다.' };
+  if (iv && func !== 'GP') return { ok: false, error: '봉(일봉·주봉 등)은 GP 와 함께 씁니다.' };
 
-  return { ok: true, func, ticker, range: func === 'GP' ? range || '6M' : null, action };
+  return { ok: true, func, ticker, iv: func === 'GP' ? iv || 'D' : null, action };
 }
 
 /** Text shown in a panel header, Bloomberg style: "AAPL US Equity  GP". */
 export function describe(cmd) {
   const t = cmd.ticker ? `${cmd.ticker} ` : '';
-  return `${t}${cmd.func}${cmd.range && cmd.range !== '6M' ? ' ' + cmd.range : ''}`;
+  return `${t}${cmd.func}${cmd.iv && cmd.iv !== 'D' ? ' ' + IV_LABEL[cmd.iv] : ''}`;
 }
 
 /** Suggestions for the autocomplete dropdown (functions only; tickers come from search). */
