@@ -42,9 +42,17 @@ npm test           # 명령어 해석 + API 단위 테스트
 
 서버 없이 `public/index.html`만 열면 **DEMO 모드**(빨간 배너)로 가짜 데이터를 보여줍니다.
 
-## 배포 (Netlify)
+## 배포 (Cloudflare Workers — 무료)
 
-`netlify.toml` 이 들어 있어 저장소를 Netlify에 연결하면 바로 배포됩니다. `public/` 이 화면, `netlify/functions/api.mjs` 가 `/api/*` 시세 프록시입니다. 키나 비밀값은 필요 없습니다.
+`wrangler.toml` + `worker.mjs` 가 들어 있어 Worker 하나가 화면(`public/`)과 시세 API(`/api/*`)를 같은 주소로 서비스합니다. 키·비밀값 필요 없음.
+
+1. Cloudflare 가입 → **Workers & Pages → Create → Import a repository** → GitHub 연결 → `investment` 선택
+2. 설정: Project name `open-terminal` · Build command **비움** · Deploy command `npx wrangler deploy` · 배포할 브랜치 선택
+3. 배포가 끝나면 `https://open-terminal.<계정>.workers.dev` 주소가 생김 → 상단 배지가 **LIVE** 면 야후 시세 연결 성공
+
+터미널로 배포하려면: `npx wrangler login` → `npm run deploy`. 로컬 확인: `npm run dev:cf`.
+
+Netlify(`netlify.toml`)로도 배포할 수 있습니다.
 
 ## 구조
 
@@ -55,7 +63,8 @@ public/js/app.js           패널·레이아웃·자동완성·단축키·시계
 public/js/functions.js     기능별 화면 (DES GP N WEI FX CMDTY CRYPTO GC W HELP)
 public/js/api.js           데이터 호출 + DEMO 대체 데이터
 public/vendor/             TradingView Lightweight Charts 4.2.3 (Apache-2.0)
-api/yahoo.mjs              /api/health · chart · quotes · search (로컬 서버·Netlify 공용)
+api/yahoo.mjs              /api/health · chart · quotes · search (로컬·Cloudflare·Netlify 공용)
+worker.mjs                 Cloudflare Worker 진입점
 server.mjs                 로컬 서버 (정적 파일 + API)
 ```
 

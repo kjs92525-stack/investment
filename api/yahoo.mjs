@@ -4,6 +4,7 @@
 
 const UA = 'Mozilla/5.0 (compatible; OpenTerminal/0.1)';
 const YF = 'https://query1.finance.yahoo.com';
+const YF2 = 'https://query2.finance.yahoo.com'; // fallback host
 
 // range -> Yahoo interval
 export const RANGES = {
@@ -23,7 +24,12 @@ const TTL_MS = 20_000;
 async function getJson(url, fetchImpl) {
   const hit = cache.get(url);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
-  const res = await fetchImpl(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } });
+  const opts = { headers: { 'User-Agent': UA, Accept: 'application/json' } };
+  let res = await fetchImpl(url, opts);
+  // Yahoo sometimes rate-limits (429) or refuses one host from cloud IPs: retry on query2.
+  if ((res.status === 429 || res.status >= 500 || res.status === 403) && url.startsWith(YF)) {
+    res = await fetchImpl(YF2 + url.slice(YF.length), opts);
+  }
   if (!res.ok) throw new HttpError(res.status === 404 ? 404 : 502, `upstream ${res.status}`);
   const data = await res.json();
   cache.set(url, { at: Date.now(), data });

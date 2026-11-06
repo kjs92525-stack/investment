@@ -68,3 +68,15 @@ test('input validation', async () => {
   assert.equal((await call('/api/quotes')).status, 400);
   assert.equal((await call('/api/nope')).status, 404);
 });
+
+test('falls back to query2 when query1 is rate-limited', async () => {
+  const calls = [];
+  const f = async (url) => {
+    calls.push(url);
+    if (url.startsWith('https://query1.')) return new Response('', { status: 429 });
+    return Response.json(chartJson('ZZZ'));
+  };
+  const r = await handleApi(new Request('http://t/api/chart?symbol=ZZZ'), f);
+  assert.equal(r.status, 200);
+  assert.match(calls[1], /^https:\/\/query2\./);
+});
