@@ -1,0 +1,8 @@
+name = "open-terminal"
+main = "worker.mjs"
+compatibility_date = "2025-09-01"
+
+# public/ is served as static files; requests with no matching file (/api/*) reach worker.mjs
+[assets]
+directory = "./public"
+binding = "ASSETS"
